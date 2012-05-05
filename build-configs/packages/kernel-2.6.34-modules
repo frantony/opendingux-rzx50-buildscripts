@@ -1,0 +1,7 @@
+PACK_NAME=kernel-2.6.34-modules
+PACK_FILES=" \
+local/lib/modules/g_serial.ko \
+local/lib/modules/g_file_storage.ko \
+local/lib/modules/g_mass_storage.ko \
+local/lib/modules/g_ether.ko \
+"

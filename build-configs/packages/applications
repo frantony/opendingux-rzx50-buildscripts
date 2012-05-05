@@ -1,0 +1,12 @@
+PACK_NAME=applications
+PACK_FILES=" \
+local/home/.gmenu2x/sections/applications/dingux-commander
+local/apps/dingux-commander
+local/home/.gmenu2x/sections/applications/dingux-write
+local/apps/dingux-write
+local/home/.gmenu2x/sections/applications/viewimage
+local/apps/viewimage
+local/home/.gmenu2x/sections/applications/gpmark
+local/apps/gpmark
+local/bin/gmenu2x
+"

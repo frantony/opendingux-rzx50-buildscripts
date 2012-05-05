@@ -1,0 +1,8 @@
+kernel-2.6.34
+kernel-2.6.34-modules
+kexec-static
+rootfs
+applications
+emulators
+games
+gmenu2x

@@ -1,0 +1,42 @@
+#
+# clab framework
+# (c) 2011, Antony Pavlov
+#
+# common functions.
+#
+
+# set default TMP_DIR, DIST_DIR and OUT_DIR
+if [ -z "$TMP_DIR" ]; then
+	TMP_DIR=~/tmp
+fi
+
+if [ -z "$DIST_DIR" ]; then
+	DIST_DIR=$(pwd)
+fi
+
+if [ -z "$OUT_DIR" ]; then
+	OUT_DIR=$DIST_DIR/out/$OUT_SUBDIR
+fi
+
+export TMP_DIR
+export DIST_DIR
+export OUT_DIR
+
+# check number of processors, tune -j make option
+if [ "$MAKE_J" = "" ]; then
+	export MAKE_J=$(cat /proc/cpuinfo | grep ^processor | wc -l)
+	if [ "$MAKE_J" = "0" -o "$MAKE_J" = "" ]; then
+		export MAKE_J=1
+	fi
+fi
+#export MAKE_J=2
+
+run_with_check()
+{
+	echo "run_with_check:" "$@"
+	$@
+	if [ "$?" != "0" ]; then
+		echo "fail: $@"
+		exit 1
+	fi
+}

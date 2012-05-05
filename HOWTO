@@ -1,0 +1,29 @@
+== SOFTWARE REQUIREMENTS ==
+
+Compiling the toolchain, the kernel & the rootfs:
+ * use Debian Linux based system; here is the list of the necessary packages:
+    bash python
+    libglib2.0-dev zlib1g-dev libexpat1-dev
+    libncursesw5-dev libncurses5-dev
+    gcc g++ make flex bison libtool automake gperf
+    curl wget
+    texinfo gawk gettext
+    sudo
+
+ * the toolchain by default will be installed in /opt/rzx50 directory,
+so make sure you have write-enabled /opt/rzx50 directory for your build user (e.g. chmod 777 /opt) and 300 MB of disk space in /opt;
+
+ * build process use ~/tmp/ to store temporary files, so check,
+that you have free 3 GB of disk space there.
+
+== BUILD: STEP BY STEP ==
+To use the scripts first time you must get some archives (source files for
+crosstool-ng, rootfs and applications). Use mk_src_dir.sh script to do it:
+
+ ./mk_src_dir.sh
+
+The script will create the src and packages-ro subdirectories.
+Also mk_src_dir.sh will download all necessary files.
+Now you can build software
+
+ ./build-all.sh

@@ -1,0 +1,14 @@
+LINUX=linux-2.6.34
+LINUX_SUFFIX=rzx50-20120320
+LINUX_CONFIG=$(dirname $LINUX_BUILD_CFG)/$LINUX.config
+LINUX_SRC=$DIST_DIR/src/$LINUX.tar.bz2
+LINUX_PATCHES=" \
+$(dirname $LINUX_BUILD_CFG)/0001-MIPS-add-Ingenic-JZ4750D-support.patch
+$(dirname $LINUX_BUILD_CFG)/0002-add-rzx50-keypad-driver.patch
+$(dirname $LINUX_BUILD_CFG)/0003-JZ4750D-fix-MSC0-write.patch
+$(dirname $LINUX_BUILD_CFG)/0004-add-Opendingux-RZX-50-logo.patch
+$(dirname $LINUX_BUILD_CFG)/0005-add-rzx50_defconfig.patch
+"
+LINUX_ARCH=mips
+LINUX_MININIT=mininit-r194
+LINUX_MININIT_SRC=$DIST_DIR/src/$LINUX_MININIT.tar.gz

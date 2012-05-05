@@ -1,0 +1,4 @@
+PACK_NAME=gmenu2x
+PACK_FILES=" \
+local/bin/gmenu2x
+"

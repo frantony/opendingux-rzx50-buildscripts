@@ -1,0 +1,15 @@
+PACK_NAME=emulators
+PACK_FILES=" \
+local/apps/fceu
+local/home/.gmenu2x/sections/emulators/fceu
+local/apps/gnuboy
+local/home/.gmenu2x/sections/emulators/gnuboy
+local/apps/scummvm
+local/home/.gmenu2x/sections/emulators/scummvm
+local/apps/snes9x
+local/home/.gmenu2x/sections/emulators/snes9x
+local/apps/stella
+local/home/.gmenu2x/sections/emulators/stella
+local/apps/unrealspeccyp
+local/home/.gmenu2x/sections/emulators/unrealspeccyp
+"

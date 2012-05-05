@@ -1,0 +1,4 @@
+PACK_NAME=kernel-2.6.34
+PACK_FILES=" \
+vmlinux \
+"

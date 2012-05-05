@@ -1,0 +1,13 @@
+opendingux-rzx50: build scripts
+(c) 2012, Antony Pavlov
+
+set of scripts, patches and configuration files
+to deploy tools for cross-platform software development.
+
+clab contains the scripts for many purposes
+  * configure crosstool-ng to build and install toolchain;
+  * build linux kernel;
+  * build busybox-based root filesystem;
+  * build applications.
+
+Read HOWTO for instructions.

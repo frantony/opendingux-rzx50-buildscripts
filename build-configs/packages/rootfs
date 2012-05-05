@@ -1,0 +1,4 @@
+PACK_NAME=rootfs
+PACK_FILES=" \
+rootfs \
+"

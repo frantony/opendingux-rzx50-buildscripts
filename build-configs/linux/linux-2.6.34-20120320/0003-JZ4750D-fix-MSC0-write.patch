@@ -1,0 +1,26 @@
+From 5a6a24e538ce6f3a2ad58cd4ffd45ef13811e52a Mon Sep 17 00:00:00 2001
+From: Antony Pavlov <antonynpavlov@gmail.com>
+Date: Wed, 22 Feb 2012 09:37:47 +0400
+Subject: [PATCH 3/5] JZ4750D: fix MSC0 write
+
+Signed-off-by: Antony Pavlov <antonynpavlov@gmail.com>
+---
+ drivers/mmc/host/jzmmc/jz_mmc_main.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/jzmmc/jz_mmc_main.c b/drivers/mmc/host/jzmmc/jz_mmc_main.c
+index 63e71bb..2c47fea 100644
+--- a/drivers/mmc/host/jzmmc/jz_mmc_main.c
++++ b/drivers/mmc/host/jzmmc/jz_mmc_main.c
+@@ -150,7 +150,7 @@ static void jz_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 		return;
+ 	}
+ 
+-#if defined(CONFIG_JZ_SYSTEM_AT_CARD)
++#if 0
+ 	if(host->pdev_id == 0 ){
+ 		if (mrq->data && (mrq->data->flags & MMC_DATA_WRITE)){
+ 			if(!jz_mmc_get_permission(mmc, mrq) && mrq->cmd->opcode != 6) {
+-- 
+1.7.9.1
+

@@ -1,0 +1,32 @@
+ARCH=mipsel
+VENDOR=rzx50
+TC_CFG=$ARCH-$VENDOR-linux-uclibc
+OUT_SUBDIR=rzx50-20120331
+
+# cross-toolchain prefix
+PREFIX=/opt/$VENDOR
+
+CROSS_COMPILE=$PREFIX/bin/${TC_CFG}-
+#BUILD_TOOLCHAIN_CONFIG=build-configs/toolchain/ct-ng-1.14.1-$TC_CFG-wchar-locale/config
+BUILD_TOOLCHAIN_CONFIG=build-configs/toolchain/ct-ng-1.14.1-$TC_CFG-wchar/config
+BUILD_LINUX_CONFIG=build-configs/linux/linux-2.6.34-20120320/config
+BUILDROOT_CONFIG=build-configs/buildroot/opendingux-rzx50-buildroot.git/config
+
+#######################################################################
+# packages
+#######################################################################
+PACKAGES_DIR=$DIST_DIR/packages
+
+# package creation
+PACKAGES_LIST=build-configs/packages/rzx50-20120331-packages.list
+WORK_DIR=$OUT_DIR
+
+# od archive creation
+OD_ARCHIVE_CONFIG=build-configs/packages/rzx50-20120331-od-archive.config
+OD_ARCHIVE_NAME=$DIST_DIR/opendingux-rzx50-20120331.tar.gz
+
+# kexec is built by buildroot
+#BUILD_KEXEC_TOOLS_CONFIG=build-configs/rzx50-20120331
+#KEXEC_TOOLS=kexec-tools-2.0.1
+#KEXEC_TOOLS_SRC=$DIST_DIR/src/$KEXEC_TOOLS.tar.bz2
+#KEXEC_TOOLS_CONFIGURE_OPTS="--host=$ARCH-linux"

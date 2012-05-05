@@ -1,0 +1,435 @@
+From f6b6b44f285f213c8382d1643664747aaba4d413 Mon Sep 17 00:00:00 2001
+From: Antony Pavlov <antonynpavlov@gmail.com>
+Date: Sun, 12 Feb 2012 09:56:46 +0400
+Subject: [PATCH 2/5] add rzx50 keypad driver
+
+Signed-off-by: Antony Pavlov <antonynpavlov@gmail.com>
+---
+ drivers/input/keyboard/Kconfig        |   10 +
+ drivers/input/keyboard/Makefile       |    1 +
+ drivers/input/keyboard/rzx50_keypad.c |  380 +++++++++++++++++++++++++++++++++
+ 3 files changed, 391 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/input/keyboard/rzx50_keypad.c
+
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index 64c1023..6ff5ccf 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -201,6 +201,16 @@ config KEYBOARD_MATRIX
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called matrix_keypad.
+ 
++config KEYBOARD_RZX50
++	tristate "Ritmix RZX-50 keypad support"
++	depends on JZ4750D_CETUS
++	help
++	  Enable Y here to support Ritmix RZX-50 keypad.
++	  The code of this driver is based on JZ Keypad ( 5 x 5 ) Driver and
++	  on GPIO driven matrix keyboard driver.
++          This driver is likely to disappear in favour of
++          the matrix_keypad driver.
++
+ config KEYBOARD_HIL_OLD
+ 	tristate "HP HIL keyboard support (simple driver)"
+ 	depends on GSC || HP300
+diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
+index 706c6b5..17fab6f 100644
+--- a/drivers/input/keyboard/Makefile
++++ b/drivers/input/keyboard/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_KEYBOARD_LM8323)		+= lm8323.o
+ obj-$(CONFIG_KEYBOARD_LOCOMO)		+= locomokbd.o
+ obj-$(CONFIG_KEYBOARD_MAPLE)		+= maple_keyb.o
+ obj-$(CONFIG_KEYBOARD_MATRIX)		+= matrix_keypad.o
++obj-$(CONFIG_KEYBOARD_RZX50)		+= rzx50_keypad.o
+ obj-$(CONFIG_KEYBOARD_MAX7359)		+= max7359_keypad.o
+ obj-$(CONFIG_KEYBOARD_NEWTON)		+= newtonkbd.o
+ obj-$(CONFIG_KEYBOARD_OMAP)		+= omap-keypad.o
+diff --git a/drivers/input/keyboard/rzx50_keypad.c b/drivers/input/keyboard/rzx50_keypad.c
+new file mode 100644
+index 0000000..856a7e0
+--- /dev/null
++++ b/drivers/input/keyboard/rzx50_keypad.c
+@@ -0,0 +1,380 @@
++/*
++ * RZX-50 keypad temporary driver.
++ *
++ * Author: Antony
++ *
++ * The code of this driver is based on JZ Keypad ( 5 x 5 ) Driver and
++ * on GPIO driven matrix keyboard driver.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/version.h>
++
++#include <linux/init.h>
++#include <linux/fs.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/sched.h>
++#include <linux/pm.h>
++#include <linux/sysctl.h>
++#include <linux/proc_fs.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/input.h>
++#include <linux/gpio_keys.h>
++
++#include <asm/gpio.h>
++#include <asm/mach-jz4750d/jz4750d.h>
++
++#define JZPD19 (3 * 32 + 19)
++#define JZPE30 (4 * 32 + 30)
++#define JZPE18 (4 * 32 + 18)
++#define JZPE11 (4 * 32 + 11)
++#define JZPE8 (4 * 32 + 8)
++#define JZPE7 (4 * 32 + 7)
++#define JZPE3 (4 * 32 + 3)
++#define JZPF12 (5 * 32 + 12)
++#define JZPF11 (5 * 32 + 11)
++#define JZPF10 (5 * 32 + 10)
++
++#define KB_ROWS	3
++#define KB_COLS	4
++
++#define SCAN_INTERVAL	(10)
++
++#define SET_GPIOS_AS_INPUT()						\
++do {									\
++	unsigned short i;						\
++									\
++	for (i = 0; i < KB_ROWS; i++) {					\
++		__gpio_as_input(jz_row_gpios[i]);			\
++	}								\
++	for (i = 0; i < KB_COLS; i++) {					\
++		__gpio_as_input(jz_col_gpios[i]);			\
++	}								\
++} while (0)
++
++#define GET_ROW_GPIO_PINS()						\
++({									\
++	unsigned short _pins = 0, i;					\
++	for (i = 0;							\
++	     i < KB_ROWS;						\
++	     _pins |= __gpio_get_pin(jz_row_gpios[i]) << i, i++)	\
++		;							\
++	_pins;								\
++})
++
++static const unsigned short jz_col_gpios[KB_COLS] = {JZPF12, JZPF11, JZPF10, JZPE18};
++static const unsigned short jz_row_gpios[KB_ROWS] = {JZPE7, JZPE8, JZPD19};
++
++static const unsigned int rzx50_keypad_keycode[KB_ROWS * KB_COLS + 3] = {
++	/* matrix keys */
++	/* row E7 */
++	KEY_LEFTCTRL,	/* A */
++	KEY_LEFTALT,	/* B */
++	KEY_LEFTSHIFT,	/* Y */
++	KEY_ENTER,	/* START */
++
++	/* row E8 */
++	KEY_ESC,	/* SELECT */
++	KEY_BACKSPACE,	/* R */
++	KEY_SPACE,	/* X */
++	KEY_RESERVED,   /* not used */
++
++	/* row D19 */
++	KEY_DOWN,	/* 91 DOWN */
++	KEY_RIGHT,	/* 90 RIGHT */
++	KEY_LEFT,	/* 92 LEFT */
++	KEY_UP,		/* 89 UP */
++
++	/* self-contained key */
++	KEY_TAB,	/* L */
++	KEY_POWER,	/* POWER */
++	KEY_PAUSE,	/* HOLD */
++};
++
++struct rzx50_keypad {
++	unsigned int keycode[ARRAY_SIZE(rzx50_keypad_keycode)];
++	struct input_dev *input;
++	char phys[32];
++
++	spinlock_t lock;
++	struct timer_list timer;
++
++	unsigned int suspended;
++	unsigned long suspend_jiffies;
++};
++static struct rzx50_keypad g_rzx50_keypad;
++
++static unsigned short scan_result[KB_COLS];
++static unsigned short pre_scan_result[KB_COLS] = {0x3, 0x3, 0x3, 0x3};
++static unsigned int lkey_scan_result, lkey_pre_scan_result;
++static unsigned int powerkey_scan_result, powerkey_pre_scan_result;
++static unsigned int holdkey_scan_result, holdkey_pre_scan_result;
++
++/**
++ *  Scan keypad by reading GPIO pins.
++ */
++static inline void jz_do_scan(unsigned short *s)
++{
++	unsigned short i;
++
++	if (!s)
++		return ;
++
++	for (i = 0; i < KB_COLS; i++) {
++
++		SET_GPIOS_AS_INPUT();
++		__gpio_clear_pin(jz_col_gpios[i]);
++		__gpio_as_output(jz_col_gpios[i]);
++
++		udelay(1000);
++
++		s[i] = GET_ROW_GPIO_PINS();
++	}
++}
++
++static inline void rzx50_check_scont_key(struct rzx50_keypad *kbd_data,
++	unsigned int *key_scan_result,
++	unsigned int *key_pre_scan_result,
++	unsigned int key)
++{
++	if (*key_pre_scan_result != *key_scan_result) {
++		input_report_key(kbd_data->input, key,
++			*key_pre_scan_result);
++		input_sync(kbd_data->input);
++	}
++
++	*key_pre_scan_result = *key_scan_result;
++}
++
++/**
++ *  Call scan function and handle 'GPIO event'(like key down, key up),
++ *  and report it to upper layer of input subsystem ... if necessary
++ */
++static void rzx50_keypad_scan(struct rzx50_keypad *kbd_data)
++{
++	unsigned short row, col;
++	unsigned long flags;
++
++	if (kbd_data->suspended)
++		return;
++
++	spin_lock_irqsave(&kbd_data->lock, flags);
++
++	__gpio_as_input(JZPE11);
++	lkey_scan_result = __gpio_get_pin(JZPE11);
++	__gpio_as_input(JZPE30);
++	powerkey_scan_result = __gpio_get_pin(JZPE30);
++	__gpio_as_input(JZPE3);
++	holdkey_scan_result = __gpio_get_pin(JZPE3);
++
++	jz_do_scan(scan_result);
++
++	for (col = 0; col < KB_COLS; col++) {
++		uint32_t bits_changed;
++
++		bits_changed = pre_scan_result[col] ^ scan_result[col];
++		if (bits_changed == 0)
++			continue;
++
++		for (row = 0; row < KB_ROWS; row++) {
++			unsigned int code;
++			int value;
++
++			if ((bits_changed & (1 << row)) == 0)
++				continue;
++
++			code = kbd_data->keycode[row * KB_COLS + col];
++			value = !(scan_result[col] & (1 << row));
++
++			#ifdef RZX50_KEYPAD_DEBUG
++			printk(KERN_ERR "row=%d, col=%d,"
++				" code=0x%04x, value=%d\n", row, col,
++				 code, value);
++			#endif
++
++			input_report_key(kbd_data->input, code, value);
++			input_sync(kbd_data->input);
++		}
++	}
++
++	memcpy(pre_scan_result, scan_result, sizeof(scan_result));
++
++	rzx50_check_scont_key(kbd_data, &lkey_scan_result,
++		&lkey_pre_scan_result, KEY_TAB);
++
++	rzx50_check_scont_key(kbd_data, &powerkey_scan_result,
++		&powerkey_pre_scan_result, KEY_POWER);
++
++	rzx50_check_scont_key(kbd_data, &holdkey_scan_result,
++		&holdkey_pre_scan_result, KEY_PAUSE);
++
++	#ifdef RZX50_KEYPAD_DEBUG
++	printk(KERN_ERR "LKEY: %d -> %d, POWER: %d -> %d, HOLD: %d -> %d\n",
++		lkey_pre_scan_result, lkey_scan_result,
++		powerkey_pre_scan_result, powerkey_scan_result,
++		holdkey_pre_scan_result, holdkey_scan_result
++);
++	#endif
++
++	spin_unlock_irqrestore(&kbd_data->lock, flags);
++
++	#ifdef RZX50_KEYPAD_DEBUG
++	printk("results: %02x %02x %02x %02x\n", scan_result[0],
++		scan_result[1], scan_result[2], scan_result[3]);
++	#endif
++
++	return;
++}
++
++static void rzx50_keypad_timer_callback(unsigned long data)
++{
++	rzx50_keypad_scan(&g_rzx50_keypad);
++	mod_timer(&g_rzx50_keypad.timer, jiffies + SCAN_INTERVAL);
++}
++
++#ifdef CONFIG_PM
++static int rzx50_keypad_suspend(struct platform_device *dev, pm_message_t state)
++{
++	struct rzx50_keypad *rzx50_keypad = platform_get_drvdata(dev);
++
++	#ifdef RZX50_KEYPAD_DEBUG
++	printk("%s(): called.\n", __func__);
++	#endif
++
++	rzx50_keypad->suspended = 1;
++
++	return 0;
++}
++
++static int rzx50_keypad_resume(struct platform_device *dev)
++{
++	struct rzx50_keypad *rzx50_keypad = platform_get_drvdata(dev);
++
++	#ifdef RZX50_KEYPAD_DEBUG
++	printk("%s(): called.\n", __func__);
++	#endif
++
++	rzx50_keypad->suspend_jiffies = jiffies;
++	rzx50_keypad->suspended = 0;
++
++	return 0;
++}
++
++#else
++#define rzx50_keypad_suspend		NULL
++#define rzx50_keypad_resume		NULL
++#endif
++
++/**
++ *  Driver init
++ */
++static int __devinit rzx50_keypad_probe(struct platform_device *dev)
++{
++	struct input_dev *input_dev;
++	int i, error;
++
++	input_dev = input_allocate_device();
++	if (!input_dev)
++		return -ENOMEM;
++
++	platform_set_drvdata(dev, &g_rzx50_keypad);
++
++	strcpy(g_rzx50_keypad.phys, "input/kbd0");
++
++	spin_lock_init(&g_rzx50_keypad.lock);
++
++	g_rzx50_keypad.suspend_jiffies = jiffies;
++	g_rzx50_keypad.input = input_dev;
++
++	input_dev->name = "RZX-50 Keypad";
++	input_dev->phys = g_rzx50_keypad.phys;
++
++	input_dev->id.bustype = BUS_PARPORT;
++	input_dev->id.vendor = 0x0001;
++	input_dev->id.product = 0x0001;
++	input_dev->id.version = 0x0100;
++
++	input_dev->evbit[0] = BIT(EV_KEY) | BIT(EV_REP) | BIT(EV_SYN);
++	input_dev->keycode = g_rzx50_keypad.keycode;
++	input_dev->keycodesize = sizeof(unsigned int);
++	input_dev->keycodemax = ARRAY_SIZE(rzx50_keypad_keycode);
++
++	memcpy(g_rzx50_keypad.keycode, rzx50_keypad_keycode,
++		sizeof(g_rzx50_keypad.keycode));
++
++	for ( i = 0; i < ARRAY_SIZE(rzx50_keypad_keycode); i++)
++		set_bit(g_rzx50_keypad.keycode[i], input_dev->keybit);
++
++	lkey_pre_scan_result = 1;
++	powerkey_pre_scan_result = 1;
++	holdkey_pre_scan_result = 1;
++
++	init_timer(&g_rzx50_keypad.timer);
++	g_rzx50_keypad.timer.function = rzx50_keypad_timer_callback;
++	g_rzx50_keypad.timer.data = (unsigned long)&g_rzx50_keypad;
++	mod_timer(&g_rzx50_keypad.timer, jiffies + SCAN_INTERVAL);
++
++	error = input_register_device(input_dev);
++	if (error) {
++		pr_err("rzx50-keypad: Unable to register input device,  "
++		       "error: %d\n", error);
++	}
++	printk("input: RZX-50 keypad registered.\n");
++
++	return 0;
++}
++
++static int rzx50_keypad_remove(struct platform_device *dev)
++{
++	struct rzx50_keypad *kbd = platform_get_drvdata(dev);
++
++	del_timer_sync(&kbd->timer);
++
++	SET_GPIOS_AS_INPUT();
++
++	input_unregister_device(kbd->input);
++
++	return 0;
++}
++
++static struct platform_driver rzx50_keypad_driver = {
++	.probe = rzx50_keypad_probe,
++	.remove = rzx50_keypad_remove,
++	.suspend = rzx50_keypad_suspend,
++	.resume = rzx50_keypad_resume,
++	.driver = {
++		.name	= "rzx50-keypad",
++	},
++};
++
++static struct platform_device jzkbd_device = {
++	.name	= "rzx50-keypad",
++	.id	= -1,
++};
++
++static int __init rzx50_keypad_init(void)
++{
++	platform_device_register(&jzkbd_device);
++	return platform_driver_register(&rzx50_keypad_driver);
++}
++
++static void __exit rzx50_keypad_exit(void)
++{
++	platform_device_unregister(&jzkbd_device);
++	platform_driver_unregister(&rzx50_keypad_driver);
++}
++
++module_init(rzx50_keypad_init);
++module_exit(rzx50_keypad_exit);
++
++MODULE_AUTHOR("Antony");
++MODULE_DESCRIPTION("Ritmix RZX-50 keypad driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:rzx50-keypad");
+-- 
+1.7.9.1
+

@@ -1,0 +1,4 @@
+PACK_NAME=kexec-static
+PACK_FILES=" \
+local/sbin/kexec-static \
+"
